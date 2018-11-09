@@ -1,0 +1,17 @@
+XnView sort
+hist.csv
+hist512.csv
+histeq.csv
+histeq512.csv
+lena256_PGM.pgm
+lena256_PGM_histeq.pgm
+lena256_PGM_linear.pgm
+lena256_PGM_linhisteq.pgm
+lena256_PGM_log.pgm
+lena512_PGM.pgm
+lena512_PGM_COPY.pgm
+lena512_PGM_histeq.pgm
+lena512_PGM_linear.pgm
+lena512_PGM_linhisteq.pgm
+lena512_PGM_log.pgm
+lena512_PGM_mask.pgm
