@@ -164,7 +164,7 @@ namespace MKImage {
 
 		class scalingProcessFunct {
 		public:
-			enum class Operations { unkown = 0, translation, scaling, rotation };
+			enum class Operations { unkown = 0, nearestNeighbor, bilinear};
 
 		public:
 			scalingProcessFunct(Image& image, ImageData& out, ImageData::iterator begin, ImageData::iterator end, Operations operation);

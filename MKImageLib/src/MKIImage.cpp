@@ -157,8 +157,8 @@ namespace MKImage {
 		Image::scalingProcessFunct ipThird(*this, temp, mid, threeQuarter, operation);
 		Image::scalingProcessFunct ipFourth(*this, temp, threeQuarter, temp.end(), operation);
 
-		double widthRatio = m_Body.at(0).size() / static_cast<double>(newWidth);
-		double heightRatio = m_Body.size() / static_cast<double>(newHeight);
+		double widthRatio = (m_Body.at(0).size() - 1) / static_cast<double>(newWidth);
+		double heightRatio = (m_Body.size() - 1) / static_cast<double>(newHeight);
 
 		std::thread ipThreadOne(ipFirst, widthRatio, heightRatio);
 		std::thread ipThreadTwo(ipSecond, widthRatio, heightRatio);
@@ -480,21 +480,33 @@ namespace MKImage {
 
 	std::function<short(size_t, size_t, double, double)> Image::scalingProcessFunct::operation() {
 		switch (m_Operation) {
-		case Operations::translation:
-			return [](size_t, size_t, double, double) -> short {
-				return short();
-			};
-		case Operations::scaling:
+		case Operations::nearestNeighbor:
 			return [&m_Image = m_Image, &m_Out = m_Out](size_t column, size_t row, double ratioWidth, double ratioHeight) -> short {
+				double columnIndex = column * ratioWidth;
+				double rowIndex = row * ratioHeight;
 				short val;
-				double interColumn = column * ratioWidth;
-				double interRow = row * ratioHeight;
-				val = m_Image.data().at(std::floor(interRow)).at(std::floor(interColumn));
+				val = m_Image.data().at(std::floor(rowIndex)).at(std::floor(columnIndex));
 				return val;
 			};
-		case Operations::rotation:
-			return [](size_t, size_t, double, double) -> short {
-				return short();
+		case Operations::bilinear:
+			return [&m_Image = m_Image, &m_Out = m_Out](size_t column, size_t row, double ratioWidth, double ratioHeight) -> short {
+				size_t columnIndex = static_cast<size_t>(column * ratioWidth);
+				size_t rowIndex = static_cast<size_t>(row * ratioHeight);
+				double columnDiff = (column * ratioWidth) - columnIndex;
+				double rowDiff = (row * ratioHeight) - rowIndex;
+
+				short a = m_Image.data().at(rowIndex).at(columnIndex);
+				short b = m_Image.data().at(rowIndex).at(columnIndex + 1);
+				short c = m_Image.data().at(rowIndex + 1).at(columnIndex);
+				short d = m_Image.data().at(rowIndex + 1).at(columnIndex + 1);
+
+				short val = static_cast<short>(
+					a * (1 - columnDiff) * (1 - rowDiff) +
+					b * (columnDiff) * (1 - rowDiff) +
+					c * (1 -columnDiff) * (rowDiff) +
+					d * (columnDiff) * (rowDiff)
+				);
+				return val;
 			};
 		case Operations::unkown:
 			return [](size_t, size_t, double, double) -> short {

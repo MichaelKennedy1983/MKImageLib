@@ -21,6 +21,7 @@ int main() {
 	constexpr char LENA_SHARP_SAVE[] = "lena256_PGM_sharp.pgm";
 	constexpr char LENA_EDGE_SAVE[] = "lena256_PGM_edge.pgm";
 	constexpr char LENA_ZOOM_SAVE[] = "lena256_PGM_zoom.pgm";
+	constexpr char LENA_ZOOM_SAVE2[] = "lena256_PGM_zoom2.pgm";
 	constexpr char LENA512_LIN_SAVE[] = "lena512_PGM_linear.pgm";
 	constexpr char LENA512_LOG_SAVE[] = "lena512_PGM_log.pgm";
 	constexpr char LENA512_HIST_SAVE[] = "lena512_PGM_histeq.pgm";
@@ -42,9 +43,9 @@ int main() {
 
 	auto timeStart = std::chrono::high_resolution_clock().now();
 
-	// MKImage::Image lena(LENA256);
-	// lena.scalingProcessing(lena.columns() * 3.5, lena.rows() * 3.5, MKImage::Image::ScalingOps::scaling);
-	// lena.save(LENA_ZOOM_SAVE);
+	MKImage::Image lena(LENA256);
+	lena.scalingProcessing(lena.columns() * 3.5, lena.rows() * 3.5, MKImage::Image::ScalingOps::bilinear);
+	lena.save(LENA_ZOOM_SAVE2, COMMENT);
 
 	//MKImage::Image lena(LENA256);
 	//lena.maskProcessing(MKImage::Mask::EDGE_LAPLACIAN_3X3);
@@ -109,15 +110,15 @@ int main() {
 	//lena512Mask.maskProcessing(MKImage::Mask::HARD_EDGE_LAPLACIAN_5X5);
 	//lena512Mask.save(LENA512_MASK_SAVE, COMMENT);
 
-	MKImage::Image frankie(FRANKIE_COUCH);
-	frankie.pointProcessing(MKImage::GS::linearTransformation, frankie.minValue(), frankie.maxValue(), 0, 255);
-	MKImage::MKIHistogram frankieHist(frankie);
-	frankieHist.makeEqualized();
-	frankie.pointProcessing(MKImage::GS::histogramTransformation, frankieHist, frankie.depth());
-	frankie.maskProcessing(MKImage::Mask::BLUR_5X5);
-	frankie.maskProcessing(MKImage::Mask::HARD_EDGE_LAPLACIAN_5X5);
-	frankie.pointProcessing(MKImage::GS::negative, frankie.depth());
-	frankie.save(FRANKIE_COUCH_SAVE);
+	// MKImage::Image frankie(FRANKIE_COUCH);
+	// frankie.pointProcessing(MKImage::GS::linearTransformation, frankie.minValue(), frankie.maxValue(), 0, 255);
+	// MKImage::MKIHistogram frankieHist(frankie);
+	// frankieHist.makeEqualized();
+	// frankie.pointProcessing(MKImage::GS::histogramTransformation, frankieHist, frankie.depth());
+	// frankie.maskProcessing(MKImage::Mask::BLUR_5X5);
+	// frankie.maskProcessing(MKImage::Mask::HARD_EDGE_LAPLACIAN_5X5);
+	// frankie.pointProcessing(MKImage::GS::negative, frankie.depth());
+	// frankie.save(FRANKIE_COUCH_SAVE);
 
 	//MKImage::Image peppers(PEPPERS);
 	//peppers.saveCopy();
