@@ -4,8 +4,11 @@
 
 #include <fstream>
 #include <filesystem>
+#include <cmath>
 
 namespace MKImage {
+	using Path = std::filesystem::path;
+	namespace FS = std::filesystem;
 
 	MKIHistogram::MKIHistogram() :
 		m_Data{}, m_EQData{}, m_Avg{ -1.0 }, m_Var{ -1.0 } {

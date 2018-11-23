@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cmath>
 
 namespace MKImage {
 	
@@ -139,6 +140,44 @@ namespace MKImage {
 		auto funcEnd = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> funcRuntime = funcEnd - funcStart;
 		std::cout << "Masking finished in " << funcRuntime.count() << " seconds.\n";
+	}
+
+	void Image::scalingProcessing(size_t newWidth, size_t newHeight, ScalingOps operation) {
+		auto funcStart = std::chrono::high_resolution_clock::now();
+		std::cout << "\nInterpolation started.\n";
+
+		ImageData temp(newHeight, std::vector<short>(newWidth));
+
+		ImageData::iterator mid = temp.begin() + (std::distance(temp.begin(), temp.end()) / 2);
+		ImageData::iterator oneQuarter = temp.begin() + (std::distance(temp.begin(), mid) / 2);
+		ImageData::iterator threeQuarter = mid + (std::distance(mid, temp.end()) / 2);
+
+		Image::scalingProcessFunct ipFirst(*this, temp, temp.begin(), oneQuarter, operation);
+		Image::scalingProcessFunct ipSecond(*this, temp, oneQuarter, mid, operation);
+		Image::scalingProcessFunct ipThird(*this, temp, mid, threeQuarter, operation);
+		Image::scalingProcessFunct ipFourth(*this, temp, threeQuarter, temp.end(), operation);
+
+		double widthRatio = m_Body.at(0).size() / static_cast<double>(newWidth);
+		double heightRatio = m_Body.size() / static_cast<double>(newHeight);
+
+		std::thread ipThreadOne(ipFirst, widthRatio, heightRatio);
+		std::thread ipThreadTwo(ipSecond, widthRatio, heightRatio);
+		std::thread ipThreadThree(ipThird, widthRatio, heightRatio);
+		std::thread ipThreadFour(ipFourth, widthRatio, heightRatio);
+
+		ipThreadOne.join();
+		ipThreadTwo.join();
+		ipThreadThree.join();
+		ipThreadFour.join();
+
+		m_Body = std::move(temp);
+
+		m_Columns = newWidth;
+		m_Rows = newHeight;
+
+		auto funcEnd = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> funcRuntime = funcEnd - funcStart;
+		std::cout << "Interpolation finished in " << funcRuntime.count() << " seconds.\n";
 	}
 
 	void Image::frameProcessing(Image& otherImage, FrameOps op) {
@@ -399,6 +438,67 @@ namespace MKImage {
 		case Operations::unknown:
 			return [](short imageVal, short) -> short {
 				return imageVal;
+			};
+		}
+	}
+
+	Image::scalingProcessFunct::scalingProcessFunct(Image& image, ImageData& out,
+																ImageData::iterator begin, ImageData::iterator end,
+																Operations operation) 
+		: m_Image(image), m_Out(out), m_Begin(begin), m_End(end), m_Operation(operation) {
+	}
+
+	void Image::scalingProcessFunct::operator()(double widthRatio, double heightRatio) {
+		int min = m_Image.depth();
+		int max = 0;
+
+		auto ops = operation();
+
+		size_t rowCount = m_Begin - m_Out.begin();
+		size_t colCount;
+
+		for (m_Begin; m_Begin != m_End; ++m_Begin) {
+			for (colCount = 0; colCount < m_Out.at(rowCount).size(); ++colCount) {
+				short val = ops(colCount, rowCount, widthRatio, heightRatio);
+
+				m_Image.protectRange(val);
+
+				m_Out.at(rowCount).at(colCount) = val;
+
+				if (val < min) {
+					min = val;
+				}
+				if (val > max) {
+					max = val;
+				}
+			}
+			++rowCount;
+		}
+		m_Image.updateMinMax(min);
+		m_Image.updateMinMax(max);
+	}
+
+	std::function<short(size_t, size_t, double, double)> Image::scalingProcessFunct::operation() {
+		switch (m_Operation) {
+		case Operations::translation:
+			return [](size_t, size_t, double, double) -> short {
+				return short();
+			};
+		case Operations::scaling:
+			return [&m_Image = m_Image, &m_Out = m_Out](size_t column, size_t row, double ratioWidth, double ratioHeight) -> short {
+				short val;
+				double interColumn = column * ratioWidth;
+				double interRow = row * ratioHeight;
+				val = m_Image.data().at(std::floor(interRow)).at(std::floor(interColumn));
+				return val;
+			};
+		case Operations::rotation:
+			return [](size_t, size_t, double, double) -> short {
+				return short();
+			};
+		case Operations::unkown:
+			return [](size_t, size_t, double, double) -> short {
+				return short();
 			};
 		}
 	}

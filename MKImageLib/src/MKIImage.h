@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <chrono>
 #include <type_traits>
+#include <functional>
 
 namespace MKImage {
 	using ImageData = std::vector<std::vector<short>>;
@@ -161,9 +162,30 @@ namespace MKImage {
 			Operations m_Operation;
 		};
 
+		class scalingProcessFunct {
+		public:
+			enum class Operations { unkown = 0, translation, scaling, rotation };
+
+		public:
+			scalingProcessFunct(Image& image, ImageData& out, ImageData::iterator begin, ImageData::iterator end, Operations operation);
+			void operator()(double widthRatio, double heightRatio);
+
+		private:
+			std::function<short(size_t, size_t, double, double)> operation();
+
+		private:
+			Image& m_Image;
+			ImageData& m_Out;
+			ImageData::iterator m_Begin;
+			ImageData::iterator m_End;
+			Operations m_Operation;
+		};
+
 		public:
 			using FrameOps = FrameProcessFunct::Operations;
 			void frameProcessing(Image& otherImage, FrameOps operation);
+			using ScalingOps = scalingProcessFunct::Operations;
+			void scalingProcessing(size_t newWidth, size_t newHeight, ScalingOps operation);
 	};
 	
 	/* #################### End of Image class definition #################### */
@@ -174,11 +196,9 @@ namespace MKImage {
 	void Image::singlePointProcess(Func f, Args... values) {
 		for (auto& i : m_Body) {
 			for (auto& j : i) {
-				for (auto& k : j) {
-					k = f(k, values...);
-					protectRange(k);
-					updateMinMax(k);
-				}
+				j = f(j, values...);
+				protectRange(j);
+				updateMinMax(j);
 			}
 		}
 	}
