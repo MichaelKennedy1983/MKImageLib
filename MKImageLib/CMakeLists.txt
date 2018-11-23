@@ -8,9 +8,9 @@ set(lib_src
 
 add_library(MKImageLib ${lib_src})
 set_target_properties(MKImageLib PROPERTIES
-                      CMAKE_CXX_STANDARD 17
+                      CXX_STANDARD 17
                       CXX_STANDARD_REQUIRED ON
-                      CMAKE_CXX_EXTENSIONS OFF
+                      CXX_EXTENSIONS OFF
 )
 target_compile_options(MKImageLib PUBLIC
     -std=c++17

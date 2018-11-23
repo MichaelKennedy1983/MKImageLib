@@ -42,9 +42,9 @@ int main() {
 
 	auto timeStart = std::chrono::high_resolution_clock().now();
 
-	MKImage::Image lena(LENA256);
-	lena.scalingProcessing(lena.columns() * 3.5, lena.rows() * 3.5, MKImage::Image::ScalingOps::scaling);
-	lena.save(LENA_ZOOM_SAVE);
+	// MKImage::Image lena(LENA256);
+	// lena.scalingProcessing(lena.columns() * 3.5, lena.rows() * 3.5, MKImage::Image::ScalingOps::scaling);
+	// lena.save(LENA_ZOOM_SAVE);
 
 	//MKImage::Image lena(LENA256);
 	//lena.maskProcessing(MKImage::Mask::EDGE_LAPLACIAN_3X3);
@@ -109,16 +109,15 @@ int main() {
 	//lena512Mask.maskProcessing(MKImage::Mask::HARD_EDGE_LAPLACIAN_5X5);
 	//lena512Mask.save(LENA512_MASK_SAVE, COMMENT);
 
-	//MKImage::Image frankie(FRANKIE_COUCH);
-	//frankie.saveCopy();
-	//frankie.pointProcessing(MKImage::GS::linearTransformation, frankie.minValue(), frankie.maxValue(), 0, 255);
-	//MKImage::MKIHistogram frankieHist(frankie);
-	//frankieHist.makeEqualized();
-	//frankie.pointProcessing(MKImage::GS::histogramTransformation, frankieHist, frankie.depth());
-	//frankie.maskProcessing(MKImage::Mask::BLUR_5X5);
-	//frankie.maskProcessing(MKImage::Mask::HARD_EDGE_LAPLACIAN_5X5);
-	//frankie.pointProcessing(MKImage::GS::negative, frankie.depth());
-	//frankie.save(FRANKIE_COUCH_SAVE);
+	MKImage::Image frankie(FRANKIE_COUCH);
+	frankie.pointProcessing(MKImage::GS::linearTransformation, frankie.minValue(), frankie.maxValue(), 0, 255);
+	MKImage::MKIHistogram frankieHist(frankie);
+	frankieHist.makeEqualized();
+	frankie.pointProcessing(MKImage::GS::histogramTransformation, frankieHist, frankie.depth());
+	frankie.maskProcessing(MKImage::Mask::BLUR_5X5);
+	frankie.maskProcessing(MKImage::Mask::HARD_EDGE_LAPLACIAN_5X5);
+	frankie.pointProcessing(MKImage::GS::negative, frankie.depth());
+	frankie.save(FRANKIE_COUCH_SAVE);
 
 	//MKImage::Image peppers(PEPPERS);
 	//peppers.saveCopy();
@@ -134,6 +133,7 @@ int main() {
 	//size_t threads = std::thread::hardware_concurrency();
 	//std::cout << "Number of threads supported on this computer is: " << threads << std::endl;
 
+	std::cout << "Press enter to continue\n";
 	std::cin.get();
 
 	return 0;

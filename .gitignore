@@ -31,6 +31,9 @@ bld/
 # Visual Studio Code workspace settings
 .vscode/
 
+# Image folder
+img/
+
 # MSTest test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
