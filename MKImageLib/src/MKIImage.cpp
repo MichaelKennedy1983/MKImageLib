@@ -152,13 +152,13 @@ namespace MKImage {
 		ImageData::iterator oneQuarter = temp.begin() + (std::distance(temp.begin(), mid) / 2);
 		ImageData::iterator threeQuarter = mid + (std::distance(mid, temp.end()) / 2);
 
-		Image::scalingProcessFunct ipFirst(*this, temp, temp.begin(), oneQuarter, operation);
-		Image::scalingProcessFunct ipSecond(*this, temp, oneQuarter, mid, operation);
-		Image::scalingProcessFunct ipThird(*this, temp, mid, threeQuarter, operation);
-		Image::scalingProcessFunct ipFourth(*this, temp, threeQuarter, temp.end(), operation);
+		Image::ScalingProcessFunct ipFirst(*this, temp, temp.begin(), oneQuarter, operation);
+		Image::ScalingProcessFunct ipSecond(*this, temp, oneQuarter, mid, operation);
+		Image::ScalingProcessFunct ipThird(*this, temp, mid, threeQuarter, operation);
+		Image::ScalingProcessFunct ipFourth(*this, temp, threeQuarter, temp.end(), operation);
 
-		double widthRatio = (m_Body.at(0).size() - 1) / static_cast<double>(newWidth);
-		double heightRatio = (m_Body.size() - 1) / static_cast<double>(newHeight);
+		double widthRatio = columns() / static_cast<double>(newWidth);
+		double heightRatio = rows() / static_cast<double>(newHeight);
 
 		std::thread ipThreadOne(ipFirst, widthRatio, heightRatio);
 		std::thread ipThreadTwo(ipSecond, widthRatio, heightRatio);
@@ -442,13 +442,13 @@ namespace MKImage {
 		}
 	}
 
-	Image::scalingProcessFunct::scalingProcessFunct(Image& image, ImageData& out,
+	Image::ScalingProcessFunct::ScalingProcessFunct(Image& image, ImageData& out,
 																ImageData::iterator begin, ImageData::iterator end,
 																Operations operation) 
 		: m_Image(image), m_Out(out), m_Begin(begin), m_End(end), m_Operation(operation) {
 	}
 
-	void Image::scalingProcessFunct::operator()(double widthRatio, double heightRatio) {
+	void Image::ScalingProcessFunct::operator()(double widthRatio, double heightRatio) {
 		int min = m_Image.depth();
 		int max = 0;
 
@@ -478,7 +478,7 @@ namespace MKImage {
 		m_Image.updateMinMax(max);
 	}
 
-	std::function<short(size_t, size_t, double, double)> Image::scalingProcessFunct::operation() {
+	std::function<short(size_t, size_t, double, double)> Image::ScalingProcessFunct::operation() {
 		switch (m_Operation) {
 		case Operations::nearestNeighbor:
 			return [&m_Image = m_Image, &m_Out = m_Out](size_t column, size_t row, double ratioWidth, double ratioHeight) -> short {
@@ -489,16 +489,16 @@ namespace MKImage {
 				return val;
 			};
 		case Operations::bilinear:
-			return [&m_Image = m_Image, &m_Out = m_Out](size_t column, size_t row, double ratioWidth, double ratioHeight) -> short {
+			return [this](size_t column, size_t row, double ratioWidth, double ratioHeight) -> short {
 				size_t columnIndex = static_cast<size_t>(column * ratioWidth);
 				size_t rowIndex = static_cast<size_t>(row * ratioHeight);
 				double columnDiff = (column * ratioWidth) - columnIndex;
 				double rowDiff = (row * ratioHeight) - rowIndex;
 
-				short a = m_Image.data().at(rowIndex).at(columnIndex);
-				short b = m_Image.data().at(rowIndex).at(columnIndex + 1);
-				short c = m_Image.data().at(rowIndex + 1).at(columnIndex);
-				short d = m_Image.data().at(rowIndex + 1).at(columnIndex + 1);
+				short a = rangeCheckedPixel(columnIndex, rowIndex);
+				short b = rangeCheckedPixel(columnIndex + 1, rowIndex);
+				short c = rangeCheckedPixel(columnIndex, rowIndex + 1);
+				short d = rangeCheckedPixel(columnIndex + 1, rowIndex + 1);
 
 				short val = static_cast<short>(
 					a * (1 - columnDiff) * (1 - rowDiff) +
@@ -513,5 +513,12 @@ namespace MKImage {
 				return short();
 			};
 		}
+	}
+
+	short Image::ScalingProcessFunct::rangeCheckedPixel(size_t column, size_t row) {
+		rangeCheck(column, size_t(0), m_Image.data().at(0).size() - 1);
+		rangeCheck(row, size_t(0), m_Image.data().size() - 1);
+
+		return m_Image.data().at(row).at(column);
 	}
 }

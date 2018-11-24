@@ -27,6 +27,8 @@ int main() {
 	constexpr char LENA512_HIST_SAVE[] = "lena512_PGM_histeq.pgm";
 	constexpr char LENA512_LINHIST_SAVE[] = "lena512_PGM_linhisteq.pgm";
 	constexpr char LENA512_MASK_SAVE[] = "lena512_PGM_mask.pgm";
+	constexpr char LENA512_ZOOM_SAVE[] = "lena512_PGM_zoom.pgm";
+	constexpr char LENA512_ZOOM_SAVE2[] = "lena512_PGM_zoom2.pgm";
 	constexpr char COMMENT[] = "# Modified using a program written by Michael Kennedy";
 	constexpr char HIST_SAVE[] = "hist.csv";
 	constexpr char HISTEQ_SAVE[] = "histeq.csv";
@@ -43,9 +45,13 @@ int main() {
 
 	auto timeStart = std::chrono::high_resolution_clock().now();
 
-	MKImage::Image lena(LENA256);
-	lena.scalingProcessing(lena.columns() * 3.5, lena.rows() * 3.5, MKImage::Image::ScalingOps::bilinear);
-	lena.save(LENA_ZOOM_SAVE2, COMMENT);
+	MKImage::Image lena(LENA512);
+	lena.scalingProcessing(lena.columns() * 3.0, lena.rows() * 3.0, MKImage::Image::ScalingOps::nearestNeighbor);
+	lena.save(LENA512_ZOOM_SAVE, COMMENT);
+
+	MKImage::Image lena2(LENA512);
+	lena2.scalingProcessing(lena2.columns() * 3.0, lena2.rows() * 3.0, MKImage::Image::ScalingOps::bilinear);
+	lena2.save(LENA512_ZOOM_SAVE2, COMMENT);
 
 	//MKImage::Image lena(LENA256);
 	//lena.maskProcessing(MKImage::Mask::EDGE_LAPLACIAN_3X3);

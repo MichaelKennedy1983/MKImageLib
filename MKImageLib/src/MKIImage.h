@@ -76,12 +76,12 @@ namespace MKImage {
 		void saveText(const Path& file, const std::string& comment = "");
 
 	private:
+		ImageData m_Body;
 		Path m_File;
+		std::mutex m_MinMaxMutex;
 		FileType m_FileType;
 		int m_Rows, m_Columns;
 		short m_Depth, m_MinLevel, m_MaxLevel;
-		ImageData m_Body;
-		std::mutex m_MinMaxMutex;
 		bool m_BadImage;
 
 	private:
@@ -162,16 +162,21 @@ namespace MKImage {
 			Operations m_Operation;
 		};
 
-		class scalingProcessFunct {
+		class ScalingProcessFunct {
 		public:
 			enum class Operations { unkown = 0, nearestNeighbor, bilinear};
 
 		public:
-			scalingProcessFunct(Image& image, ImageData& out, ImageData::iterator begin, ImageData::iterator end, Operations operation);
+			ScalingProcessFunct(Image& image, ImageData& out, ImageData::iterator begin, ImageData::iterator end, Operations operation);
 			void operator()(double widthRatio, double heightRatio);
 
 		private:
 			std::function<short(size_t, size_t, double, double)> operation();
+
+			short rangeCheckedPixel(size_t column, size_t row);
+
+			template<typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+			void rangeCheck(T& val, T min, T max);
 
 		private:
 			Image& m_Image;
@@ -184,7 +189,7 @@ namespace MKImage {
 		public:
 			using FrameOps = FrameProcessFunct::Operations;
 			void frameProcessing(Image& otherImage, FrameOps operation);
-			using ScalingOps = scalingProcessFunct::Operations;
+			using ScalingOps = ScalingProcessFunct::Operations;
 			void scalingProcessing(size_t newWidth, size_t newHeight, ScalingOps operation);
 	};
 	
@@ -234,6 +239,15 @@ namespace MKImage {
 		auto funcEnd = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> funcRuntime = funcEnd - funcStart;
 		std::cout << "Point processing finished in " << funcRuntime.count() << " seconds.\n";
+	}
+
+	template<typename T, typename>
+	void Image::ScalingProcessFunct::rangeCheck(T& val, T min, T max) {
+		if (val < min) {
+			val = min;
+		} else if (val > max) {
+			val = max;
+		}
 	}
 }
 
