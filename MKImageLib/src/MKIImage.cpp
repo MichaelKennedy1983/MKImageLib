@@ -144,7 +144,7 @@ namespace MKImage {
 
 	void Image::scalingProcessing(size_t newWidth, size_t newHeight, ScalingOps operation) {
 		auto funcStart = std::chrono::high_resolution_clock::now();
-		std::cout << "\nInterpolation started.\n";
+		std::cout << "\nScaling with " << ScalingProcessFunct::opsToString.at(operation) << ".\n";
 
 		ImageData temp(newHeight, std::vector<short>(newWidth));
 
@@ -177,7 +177,7 @@ namespace MKImage {
 
 		auto funcEnd = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> funcRuntime = funcEnd - funcStart;
-		std::cout << "Interpolation finished in " << funcRuntime.count() << " seconds.\n";
+		std::cout << "Scaling finished in " << funcRuntime.count() << " seconds.\n";
 	}
 
 	void Image::frameProcessing(Image& otherImage, FrameOps op) {
@@ -442,6 +442,13 @@ namespace MKImage {
 		}
 	}
 
+	const std::unordered_map<Image::ScalingProcessFunct::Operations, std::string>
+	Image::ScalingProcessFunct::opsToString = {
+		{Operations::nearestNeighbor, "nearest neighbor"},
+		{Operations::bilinear, "bilnear interpolation"},
+		{Operations::bicubic, "bicubic interpolation"}
+	};
+
 	Image::ScalingProcessFunct::ScalingProcessFunct(Image& image, ImageData& out,
 																ImageData::iterator begin, ImageData::iterator end,
 																Operations operation) 
@@ -478,22 +485,24 @@ namespace MKImage {
 		m_Image.updateMinMax(max);
 	}
 
-	std::function<short(size_t, size_t, double, double)> Image::ScalingProcessFunct::operation() {
+	std::function<short(size_t, size_t, float, float)> Image::ScalingProcessFunct::operation() {
 		switch (m_Operation) {
 		case Operations::nearestNeighbor:
-			return [&m_Image = m_Image, &m_Out = m_Out](size_t column, size_t row, double ratioWidth, double ratioHeight) -> short {
-				double columnIndex = column * ratioWidth;
-				double rowIndex = row * ratioHeight;
+			return [&m_Image = m_Image, &m_Out = m_Out](size_t column, size_t row, float ratioWidth, float ratioHeight) -> short {
+				float columnIndex = column * ratioWidth;
+				float rowIndex = row * ratioHeight;
 				short val;
 				val = m_Image.data().at(std::floor(rowIndex)).at(std::floor(columnIndex));
 				return val;
 			};
 		case Operations::bilinear:
-			return [this](size_t column, size_t row, double ratioWidth, double ratioHeight) -> short {
-				size_t columnIndex = static_cast<size_t>(column * ratioWidth);
-				size_t rowIndex = static_cast<size_t>(row * ratioHeight);
-				double columnDiff = (column * ratioWidth) - columnIndex;
-				double rowDiff = (row * ratioHeight) - rowIndex;
+			return [this](size_t column, size_t row, float ratioWidth, float ratioHeight) -> short {
+				float columnFloat = column * ratioWidth - 0.5f;
+				float rowFloat = row * ratioHeight - 0.5f;
+				size_t columnIndex = static_cast<size_t>(columnFloat);
+				size_t rowIndex = static_cast<size_t>(rowFloat);
+				float columnDiff = columnFloat - columnIndex;
+				float rowDiff = rowFloat - rowIndex;
 
 				short a = rangeCheckedPixel(columnIndex, rowIndex);
 				short b = rangeCheckedPixel(columnIndex + 1, rowIndex);
@@ -508,8 +517,46 @@ namespace MKImage {
 				);
 				return val;
 			};
+		case Operations::bicubic:
+			return [this](size_t column, size_t row, float ratioWidth, float ratioHeight) -> short {
+				float columnFloat = column * ratioWidth - 0.5f;
+				float rowFloat = row * ratioHeight - 0.5f;
+				size_t columnIndex = static_cast<size_t>(columnFloat);
+				size_t rowIndex = static_cast<size_t>(rowFloat);
+				float columnDiff = columnFloat - std::floor(columnFloat);
+				float rowDiff = rowFloat - std::floor(rowFloat);
+
+				short p00 = rangeCheckedPixel(columnIndex - 1, rowIndex - 1);
+				short p10 = rangeCheckedPixel(columnIndex + 0, rowIndex - 1);
+				short p20 = rangeCheckedPixel(columnIndex + 1, rowIndex - 1);
+				short p30 = rangeCheckedPixel(columnIndex + 2, rowIndex - 1);
+
+				short p01 = rangeCheckedPixel(columnIndex - 1, rowIndex + 0);
+				short p11 = rangeCheckedPixel(columnIndex + 0, rowIndex + 0);
+				short p21 = rangeCheckedPixel(columnIndex + 1, rowIndex + 0);
+				short p31 = rangeCheckedPixel(columnIndex + 2, rowIndex + 0);
+
+				short p02 = rangeCheckedPixel(columnIndex - 1, rowIndex + 1);
+				short p12 = rangeCheckedPixel(columnIndex + 0, rowIndex + 1);
+				short p22 = rangeCheckedPixel(columnIndex + 1, rowIndex + 1);
+				short p32 = rangeCheckedPixel(columnIndex + 2, rowIndex + 1);
+
+				short p03 = rangeCheckedPixel(columnIndex - 1, rowIndex + 2);
+				short p13 = rangeCheckedPixel(columnIndex + 0, rowIndex + 2);
+				short p23 = rangeCheckedPixel(columnIndex + 1, rowIndex + 2);
+				short p33 = rangeCheckedPixel(columnIndex + 2, rowIndex + 2);
+
+				float row1 = cubicHermite(p00, p10, p20, p30, columnDiff);
+				float row2 = cubicHermite(p01, p11, p21, p31, columnDiff);
+				float row3 = cubicHermite(p02, p12, p22, p32, columnDiff);
+				float row4 = cubicHermite(p03, p13, p23, p33, columnDiff);
+
+				float val = cubicHermite(row1, row2, row3, row4, rowDiff);
+				rangeCheck(val, 0.0f, static_cast<float>(m_Image.depth()));
+				return static_cast<short>(val);
+			};
 		case Operations::unkown:
-			return [](size_t, size_t, double, double) -> short {
+			return [](size_t, size_t, float, float) -> short {
 				return short();
 			};
 		}
@@ -520,5 +567,14 @@ namespace MKImage {
 		rangeCheck(row, size_t(0), m_Image.data().size() - 1);
 
 		return m_Image.data().at(row).at(column);
+	}
+
+	float Image::ScalingProcessFunct::cubicHermite(float a, float b, float c, float d, float t) {
+		float a1 = -a / 2.0f + (3.0f * b) / 2.0f - (3.0f * c) / 2.0f + d / 2.0f;
+		float b1 = a - (5.0 * b) / 2.0f + 2.0f * c - d / 2.0f;
+		float c1 = -a / 2.0f + c / 2.0f;
+		float d1 = b;
+
+		return a1*t*t*t + b1*t*t + c1*t + d1;
 	}
 }

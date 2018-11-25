@@ -11,6 +11,7 @@
 #include <chrono>
 #include <type_traits>
 #include <functional>
+#include <unordered_map>
 
 namespace MKImage {
 	using ImageData = std::vector<std::vector<short>>;
@@ -164,16 +165,18 @@ namespace MKImage {
 
 		class ScalingProcessFunct {
 		public:
-			enum class Operations { unkown = 0, nearestNeighbor, bilinear};
+			enum class Operations { unkown = 0, nearestNeighbor, bilinear, bicubic};
+			static const std::unordered_map<Operations, std::string> opsToString;
 
 		public:
 			ScalingProcessFunct(Image& image, ImageData& out, ImageData::iterator begin, ImageData::iterator end, Operations operation);
 			void operator()(double widthRatio, double heightRatio);
 
 		private:
-			std::function<short(size_t, size_t, double, double)> operation();
+			std::function<short(size_t, size_t, float, float)> operation();
 
 			short rangeCheckedPixel(size_t column, size_t row);
+			float cubicHermite(float a, float b, float c, float d, float t);
 
 			template<typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
 			void rangeCheck(T& val, T min, T max);
