@@ -10,7 +10,7 @@
 namespace MKImage {
 	
 	Image::Image() 
-		: m_File{}, m_FileType{}, m_Rows{ -1 }, m_Columns{ -1 },
+		: m_File{}, m_FileType{}, m_Rows{ 0 }, m_Columns{ 0 },
 		m_Depth{ -1 }, m_MinLevel{ 255 }, m_MaxLevel{ 0 }, m_Body(),
 		m_MinMaxMutex{}, m_BadImage{ true } {
 	}
@@ -446,7 +446,8 @@ namespace MKImage {
 	Image::ScalingProcessFunct::opsToString = {
 		{Operations::nearestNeighbor, "nearest neighbor"},
 		{Operations::bilinear, "bilnear interpolation"},
-		{Operations::bicubic, "bicubic interpolation"}
+		{Operations::bicubic, "bicubic interpolation"},
+		{Operations::lanczos2, "Lanczos2 interpolation"}
 	};
 
 	Image::ScalingProcessFunct::ScalingProcessFunct(Image& image, ImageData& out,
@@ -555,6 +556,41 @@ namespace MKImage {
 				rangeCheck(val, 0.0f, static_cast<float>(m_Image.depth()));
 				return static_cast<short>(val);
 			};
+		case Operations::lanczos2:
+			return [this](size_t column, size_t row, float ratioWidth, float ratioHeight) -> short {
+				float columnFloat = column * ratioWidth - 0.5f;
+				float rowFloat = row * ratioHeight - 0.5f;
+				size_t columnIndex = static_cast<size_t>(columnFloat);
+				size_t rowIndex = static_cast<size_t>(rowFloat);
+
+				float p00 = rangeCheckedPixel(columnIndex - 1, rowIndex - 1);
+				float p10 = rangeCheckedPixel(columnIndex + 0, rowIndex - 1);
+				float p20 = rangeCheckedPixel(columnIndex + 1, rowIndex - 1);
+				float p30 = rangeCheckedPixel(columnIndex + 2, rowIndex - 1);
+
+				float p01 = rangeCheckedPixel(columnIndex - 1, rowIndex + 0);
+				float p11 = rangeCheckedPixel(columnIndex + 0, rowIndex + 0);
+				float p21 = rangeCheckedPixel(columnIndex + 1, rowIndex + 0);
+				float p31 = rangeCheckedPixel(columnIndex + 2, rowIndex + 0);
+
+				float p02 = rangeCheckedPixel(columnIndex - 1, rowIndex + 1);
+				float p12 = rangeCheckedPixel(columnIndex + 0, rowIndex + 1);
+				float p22 = rangeCheckedPixel(columnIndex + 1, rowIndex + 1);
+				float p32 = rangeCheckedPixel(columnIndex + 2, rowIndex + 1);
+
+				float p03 = rangeCheckedPixel(columnIndex - 1, rowIndex + 2);
+				float p13 = rangeCheckedPixel(columnIndex + 0, rowIndex + 2);
+				float p23 = rangeCheckedPixel(columnIndex + 1, rowIndex + 2);
+				float p33 = rangeCheckedPixel(columnIndex + 2, rowIndex + 2);
+
+				float row1 = lanczosInterp(columnIndex, 2, {p00, p10, p20, p30});
+				float row2 = lanczosInterp(columnIndex, 2, {p01, p11, p21, p31});
+				float row3 = lanczosInterp(columnIndex, 2, {p02, p12, p32, p32});
+				float row4 = lanczosInterp(columnIndex, 2, {p03, p13, p23, p33});
+
+				float val = lanczosInterp(rowIndex, 2, {row1, row2, row3, row4});
+				return static_cast<short>(val);
+			};
 		case Operations::unkown:
 			return [](size_t, size_t, float, float) -> short {
 				return short();
@@ -563,8 +599,8 @@ namespace MKImage {
 	}
 
 	short Image::ScalingProcessFunct::rangeCheckedPixel(size_t column, size_t row) {
-		rangeCheck(column, size_t(0), m_Image.data().at(0).size() - 1);
-		rangeCheck(row, size_t(0), m_Image.data().size() - 1);
+		rangeCheck(column, size_t(0), m_Image.columns() - 1);
+		rangeCheck(row, size_t(0), m_Image.rows() - 1);
 
 		return m_Image.data().at(row).at(column);
 	}
@@ -576,5 +612,24 @@ namespace MKImage {
 		float d1 = b;
 
 		return a1*t*t*t + b1*t*t + c1*t + d1;
+	}
+
+	float Image::ScalingProcessFunct::lanczosFun(int x, size_t lobes) {
+		if (std::abs(x) >= lobes) {
+			return 0.0f;
+		}
+
+		return (std::sin(M_PI * x) / (M_PI * x)) * (std::sin((M_PI * x) / lobes) / ((M_PI * x) / lobes));
+	}
+
+	float Image::ScalingProcessFunct::lanczosInterp(size_t index, size_t lobes, std::vector<float>&& pixels) {
+		int offset = -lobes + 1; 
+
+		float val = 0.0;
+		for (int i = 0; i < pixels.size(); ++i) {
+			val += lanczosFun((index - (index + offset + i)), lobes) * pixels.at(i);
+		}
+
+		return val;
 	}
 }

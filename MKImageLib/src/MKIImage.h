@@ -27,8 +27,8 @@ namespace MKImage {
 		Image(const Image& other);
 		Image(const Image&& other);
 
-		int rows() const { return m_Rows; }
-		int columns() const { return m_Columns; }
+		size_t rows() const { return m_Rows; }
+		size_t columns() const { return m_Columns; }
 		short depth() const { return m_Depth; }
 		short minValue() const { return m_MinLevel; }
 		short maxValue() const { return m_MaxLevel; }
@@ -81,7 +81,7 @@ namespace MKImage {
 		Path m_File;
 		std::mutex m_MinMaxMutex;
 		FileType m_FileType;
-		int m_Rows, m_Columns;
+		size_t m_Rows, m_Columns;
 		short m_Depth, m_MinLevel, m_MaxLevel;
 		bool m_BadImage;
 
@@ -165,7 +165,7 @@ namespace MKImage {
 
 		class ScalingProcessFunct {
 		public:
-			enum class Operations { unkown = 0, nearestNeighbor, bilinear, bicubic};
+			enum class Operations { unkown = 0, nearestNeighbor, bilinear, bicubic, lanczos2};
 			static const std::unordered_map<Operations, std::string> opsToString;
 
 		public:
@@ -177,6 +177,8 @@ namespace MKImage {
 
 			short rangeCheckedPixel(size_t column, size_t row);
 			float cubicHermite(float a, float b, float c, float d, float t);
+			float lanczosFun(int x, size_t lobes = 2);
+			float lanczosInterp(size_t index, size_t lobes, std::vector<float>&& pixels);
 
 			template<typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
 			void rangeCheck(T& val, T min, T max);
