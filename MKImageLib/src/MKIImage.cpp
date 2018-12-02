@@ -34,6 +34,18 @@ namespace MKImage {
 
 	}
 
+	Image& Image::operator=(Image& rhs) {
+		m_File = rhs.m_File;
+		m_FileType = rhs.m_FileType;
+		m_Rows = rhs.m_Rows;
+		m_Columns = rhs.m_Columns;
+		m_Depth = rhs.m_Depth;
+		m_MinLevel = rhs.m_MinLevel;
+		m_MaxLevel = rhs.m_MaxLevel;
+		m_Body = rhs.m_Body;
+		m_BadImage = rhs.m_BadImage;
+	}
+
 	void Image::protectRange(short& val) {
 		if (val < 0)
 			val = 0;
@@ -148,27 +160,63 @@ namespace MKImage {
 
 		ImageData temp(newHeight, std::vector<short>(newWidth));
 
-		ImageData::iterator mid = temp.begin() + (std::distance(temp.begin(), temp.end()) / 2);
-		ImageData::iterator oneQuarter = temp.begin() + (std::distance(temp.begin(), mid) / 2);
-		ImageData::iterator threeQuarter = mid + (std::distance(mid, temp.end()) / 2);
+		// Dynamic threading
+		size_t numThreads = std::thread::hardware_concurrency();
 
-		Image::ScalingProcessFunct ipFirst(*this, temp, temp.begin(), oneQuarter, operation);
-		Image::ScalingProcessFunct ipSecond(*this, temp, oneQuarter, mid, operation);
-		Image::ScalingProcessFunct ipThird(*this, temp, mid, threeQuarter, operation);
-		Image::ScalingProcessFunct ipFourth(*this, temp, threeQuarter, temp.end(), operation);
+		if (numThreads > 4) {
+			numThreads -= 2;
+		}
+		
+		std::vector<ImageData::iterator> inters(numThreads + 1);
+		inters.at(0) = temp.begin();
+		inters.at(numThreads) = temp.end();
+		double threadRatio = 1.0 / (numThreads);
+		size_t interDif = (threadRatio * std::distance(temp.begin(), temp.end()));
+		for (int i = 1; i < numThreads; ++i) {
+			inters.at(i) = inters.at(i - 1) + interDif;
+		}
+
+		std::vector<Image::ScalingProcessFunct> spfs;
+		spfs.reserve(numThreads);
+		for (int i = 0; i < numThreads; ++i) {
+			//Image::ScalingProcessFunct tempSPF(*this, temp, inters.at(i), inters.at(i + 1), operation);
+			spfs.emplace_back(*this, temp, inters.at(i), inters.at(i + 1), operation);
+		}
 
 		double widthRatio = columns() / static_cast<double>(newWidth);
 		double heightRatio = rows() / static_cast<double>(newHeight);
 
-		std::thread ipThreadOne(ipFirst, widthRatio, heightRatio);
-		std::thread ipThreadTwo(ipSecond, widthRatio, heightRatio);
-		std::thread ipThreadThree(ipThird, widthRatio, heightRatio);
-		std::thread ipThreadFour(ipFourth, widthRatio, heightRatio);
+		std::vector<std::thread> threads;
+		for (int i = 0 ; i < numThreads; ++i) {
+			threads.emplace_back(spfs.at(i), widthRatio, heightRatio);
+		}
 
-		ipThreadOne.join();
-		ipThreadTwo.join();
-		ipThreadThree.join();
-		ipThreadFour.join();
+		for (auto& thread : threads) {
+			thread.join();
+		}
+		// End dynamic threading
+
+		// ImageData::iterator mid = temp.begin() + (std::distance(temp.begin(), temp.end()) / 2);
+		// ImageData::iterator oneQuarter = temp.begin() + (std::distance(temp.begin(), mid) / 2);
+		// ImageData::iterator threeQuarter = mid + (std::distance(mid, temp.end()) / 2);
+
+		// Image::ScalingProcessFunct ipFirst(*this, temp, temp.begin(), oneQuarter, operation);
+		// Image::ScalingProcessFunct ipSecond(*this, temp, oneQuarter, mid, operation);
+		// Image::ScalingProcessFunct ipThird(*this, temp, mid, threeQuarter, operation);
+		// Image::ScalingProcessFunct ipFourth(*this, temp, threeQuarter, temp.end(), operation);
+
+		// double widthRatio = columns() / static_cast<double>(newWidth);
+		// double heightRatio = rows() / static_cast<double>(newHeight);
+
+		// std::thread ipThreadOne(ipFirst, widthRatio, heightRatio);
+		// std::thread ipThreadTwo(ipSecond, widthRatio, heightRatio);
+		// std::thread ipThreadThree(ipThird, widthRatio, heightRatio);
+		// std::thread ipThreadFour(ipFourth, widthRatio, heightRatio);
+
+		// ipThreadOne.join();
+		// ipThreadTwo.join();
+		// ipThreadThree.join();
+		// ipThreadFour.join();
 
 		m_Body = std::move(temp);
 
@@ -451,10 +499,17 @@ namespace MKImage {
 	};
 
 	Image::ScalingProcessFunct::ScalingProcessFunct(Image& image, ImageData& out,
-																ImageData::iterator begin, ImageData::iterator end,
-																Operations operation) 
+													ImageData::iterator begin, ImageData::iterator end,
+													Operations operation) 
 		: m_Image(image), m_Out(out), m_Begin(begin), m_End(end), m_Operation(operation) {
 	}
+
+	// Image::ScalingProcessFunct& Image::ScalingProcessFunct::operator=(const Image::ScalingProcessFunct& rhs) {
+	// 	m_Image = rhs.m_Image;
+	// 	m_Out = rhs.m_Out;
+	// 	m_Begin = rhs.m_End;
+	// 	m_Operation = rhs.m_Operation;
+	// }
 
 	void Image::ScalingProcessFunct::operator()(double widthRatio, double heightRatio) {
 		int min = m_Image.depth();
@@ -558,8 +613,8 @@ namespace MKImage {
 			};
 		case Operations::lanczos2:
 			return [this](size_t column, size_t row, float ratioWidth, float ratioHeight) -> short {
-				float columnFloat = column * ratioWidth - 0.5f;
-				float rowFloat = row * ratioHeight - 0.5f;
+				float columnFloat = column * ratioWidth;
+				float rowFloat = row * ratioHeight;
 				size_t columnIndex = static_cast<size_t>(columnFloat);
 				size_t rowIndex = static_cast<size_t>(rowFloat);
 
@@ -617,9 +672,14 @@ namespace MKImage {
 	float Image::ScalingProcessFunct::lanczosFun(int x, size_t lobes) {
 		if (std::abs(x) >= lobes) {
 			return 0.0f;
+		} else if (x == 0) {
+			return 1.0f;
 		}
 
-		return (std::sin(M_PI * x) / (M_PI * x)) * (std::sin((M_PI * x) / lobes) / ((M_PI * x) / lobes));
+		float sinc = (std::sin(M_PI * x) / (M_PI * x));
+		float lanc = (std::sin((M_PI * x) / lobes) / ((M_PI * x) / lobes));
+
+		return sinc * lanc;
 	}
 
 	float Image::ScalingProcessFunct::lanczosInterp(size_t index, size_t lobes, std::vector<float>&& pixels) {

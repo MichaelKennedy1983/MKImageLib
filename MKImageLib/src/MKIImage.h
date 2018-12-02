@@ -26,6 +26,7 @@ namespace MKImage {
 		~Image() {}
 		Image(const Image& other);
 		Image(const Image&& other);
+		Image& operator=(Image& rhs);
 
 		size_t rows() const { return m_Rows; }
 		size_t columns() const { return m_Columns; }
@@ -170,6 +171,8 @@ namespace MKImage {
 
 		public:
 			ScalingProcessFunct(Image& image, ImageData& out, ImageData::iterator begin, ImageData::iterator end, Operations operation);
+			// ScalingProcessFunct& operator=(const ScalingProcessFunct& rhs);
+			// ScalingProcessFunct& operator=(ScalingProcessFunct&& rhs) = default;
 			void operator()(double widthRatio, double heightRatio);
 
 		private:
